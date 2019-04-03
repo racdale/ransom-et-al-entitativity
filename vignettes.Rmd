@@ -1,0 +1,149 @@
+---
+title: "Vignette Analysis with Linear Mixed Effects"
+output: pdf_document
+---
+
+Steps: (1) get in the data, (2) transform it into something that can plug into statistical models, (3) test two types of model: vignette types separate (emotion, syntax, etc.), then all together in a "competitive" model (emotion vs. syntax vs...). In general, emotion comes out on top... with the rest non-significant.
+
+```{r,results="asis"}
+library(lme4) # the regression (multi-level) library
+library(pander) # library for displaying tables
+library(ggplot2) # plotting library
+panderOptions('knitr.auto.asis', FALSE)
+
+#setwd('~/Dropbox/projects/studies/JointActionTake2/entitativity/tailer.entitativity.analysis') # move to our working directory
+#fname = 'experiment.1.feel.in.questions.csv'
+fname = 'experiment.2.no.feelings.csv'
+a = read.csv(fname,header=T,stringsAsFactors=F) # load in the sheet into a variable
+                                                      # note first line contains question content
+#pander(a[1,]) # check out the first row of data
+#pander(a[1:5,1:4]) # look at first 10 columns
+#pander(colnames(a))
+
+# let's extract the data into a pleasant sheet with factors needed
+types = c("Syn","Emo","Lex","Spac")
+for (i in 2:dim(a)[1]) { # loop through all entries (skipped first line: content)
+  for (typ in types) { # loop through stim types
+    for (j in 1:3) { # loop through stimulus #
+      colnA = which(colnames(a)==paste(typ,j,'..A',sep=''))
+      colnN = which(colnames(a)==paste(typ,j,'..N',sep=''))
+      targetCol = 0
+      if (a[i,colnA]==1) { # this was an align
+        align = "aligned"
+        targetCol = colnA
+      } else if (a[i,colnN]==1) {
+        align = "non-aligned"
+        targetCol = colnN
+      }
+      if (targetCol>0) {
+        dataRow = data.frame(a[i,1],typ,j,align,substr(a[1,targetCol],1,50),a[i,c((targetCol+1):(targetCol+5))])      
+        respnames = c()
+        for (nm in a[1,c((targetCol+1):(targetCol+5))]) {
+          words = unlist(strsplit(nm,' '))          
+          respnames = c(respnames,paste(words[(length(words)-4):length(words)],collapse='_'))
+        }
+        colnames(dataRow) = c('id','typ','n','align','item',respnames)
+        if (i==2) {
+          allData = dataRow
+        } else {
+          allData = rbind(allData,dataRow)
+        }        
+      }      
+    }
+  }    
+}
+
+# here's what it now ooks like
+pander(allData[1:4,])
+
+dim(table(as.character(allData$id)))
+allData = allData[allData$id %in% names(table(allData$id))[table(allData$id)==12],]
+dim(table(as.character(allData$id)))
+
+if (fname=='experiment.2.no.feelings.csv') {
+  colnames(allData) = gsub('\\(','',colnames(allData)) # for follow up study, cut parentheses/punct for variable names
+  colnames(allData) = gsub('\\)','',colnames(allData))
+  colnames(allData) = gsub('\\-','_',colnames(allData))
+}
+
+allData$indiv = as.numeric(allData$individuals) # make sure R sees these as numbers
+allData$ifI = as.numeric(allData$if_I)
+allData$theseindiv = as.numeric(allData$these_individuals_can_work_together)
+
+# handle different variables names in the follow up study
+if (fname=='experiment.2.no.feelings.csv') {
+  allData$thesepeople = as.numeric(allData$agree_These_people_are_like_minded)
+  allData$feelthese = as.numeric(allData$strongly_agree_These_people_share_goals)  
+} else {
+  allData$thesepeople = as.numeric(allData$these_people_are_like_minded)
+  allData$feelthese = as.numeric(allData$feel_these_people_share_goals)  
+}
+if (fname=='experiment.2.no.feelings.csv') {
+  allData$togetherScore = (allData$indiv+allData$ifI+allData$theseindiv+allData$feelthese+allData$thesepeople)/5
+} else {
+  allData$togetherScore = (allData$indiv+allData$ifI+allData$theseindiv+allData$feelthese+allData$thesepeople)/5
+}
+
+# get rid of missing data! 
+# some qualtrics participants seem not to have responded
+dim(allData)
+allData = allData[!is.na(allData$togetherScore),]
+dim(allData)
+
+# before plotting by item, let's ensure we have them aligned
+itemAlign = read.table('item_pairing.txt',sep='\t',stringsAsFactors=F)
+allData$itemID = ''
+for (i in 1:dim(allData)[1]) {
+  #print(i)
+  itemIx = grep(substr(as.character(allData[i,]$item),1,40),itemAlign$V2)
+  if (length(itemIx)==0) {
+    print(allData[i,]$item)
+  }
+  else { 
+    allData[i,]$itemID = itemAlign[itemIx,1][1] 
+  }
+}
+
+pander(paste('Time to test the combined effects of alignment X stimulus type'))
+lmo.outcome = lmer(togetherScore~align*typ+(1+typ+align|id)+(1+align|itemID),data=allData)
+coefs.outcome = data.frame(summary(lmo.outcome)$coefficient)
+coefs.outcome$p = 2*(1-pnorm(abs(coefs.outcome$t.value)))
+pander(coefs.outcome)
+
+for (typ in types) {
+  pander(paste('Time to test the effect of alignment for stimulus type:',typ))
+  lmo.outcome = lmer(togetherScore~align+(1+align|id),data=allData[allData$typ==typ,])
+  coefs.outcome = data.frame(summary(lmo.outcome)$coefficient)
+  coefs.outcome$p = 2*(1-pnorm(abs(coefs.outcome$t.value)))
+  pander(coefs.outcome)
+}
+
+b = aggregate(allData$togetherScore,by=list(allData$align,allData$typ),FUN=mean) # get means
+b_sd = aggregate(allData$togetherScore,by=list(allData$align,allData$typ),FUN=sd)
+b_n = aggregate(allData$togetherScore*0+1,by=list(allData$align,allData$typ),FUN=sum)
+
+ggplot(b, aes(fill=as.character(Group.1), y=x, x=Group.2))+scale_fill_grey()+ # togetherScore is a standard variable
+  geom_bar(position="dodge", stat="identity")+
+  geom_errorbar(aes(ymin=b$x-b_sd$x/sqrt(b_n$x),
+                    width=.2,
+                    ymax=b$x+b_sd$x/sqrt(b_n$x)),position=position_dodge(width=.9))+
+  ylab('Score based on mean of entitativity questions')+
+  xlab('')+labs(fill="Alignment") + theme_bw()
+
+b = aggregate(allData$togetherScore,by=list(allData$align,allData$typ,allData$itemID),FUN=mean) # get means
+b_sd = aggregate(allData$togetherScore,by=list(allData$align,allData$typ,allData$itemID),FUN=sd)
+b_n = aggregate(allData$togetherScore*0+1,by=list(allData$align,allData$typ,allData$itemID),FUN=sum)
+
+p <- ggplot(b, aes(fill=Group.2, y=x, x=Group.3,linetype=as.character(Group.1)))+scale_fill_grey() # togetherScore is a standard variable
+p + geom_bar(position="dodge", stat="identity")+
+  ylab('Score based on mean of entitativity questions')+
+  xlab('Item')+
+  geom_errorbar(aes(ymin=b$x-b_sd$x/sqrt(b_n$x),
+                    width=.2,
+                    ymax=b$x+b_sd$x/sqrt(b_n$x)),position=position_dodge(width=.9))+ 
+  labs(fill = "Item type", linetype="Alignment") + theme(axis.text.x = element_blank()) + theme_bw()
+
+
+
+```
+

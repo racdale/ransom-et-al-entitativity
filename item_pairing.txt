@@ -1,0 +1,24 @@
+spac1	A bewildered students sits alone in his room
+spac1	A bewildered student makes his way down the hall a
+spac2	A customer approaches a customer service
+spac2	A customer calls a customer service hotline
+spac3	A man walks into the Memphis Police Department
+spac3	A man picks up his phone and calls the Memphis
+synt1	Carol has accepted an invitation to attend a murde
+synt1	Carol has accepted an invitation to attend a murde
+synt2	John, a small business owner, has been chosen for
+synt2	John, a small business owner, has been chosen for
+synt3	Alice, a college sophomore, has an appointment to
+synt3	Alice, a college sophomore, has an appointment to
+conc1	Two strangers strike up a conversation in a shop.
+conc1	Two strangers strike up a conversation in a shop.
+conc2	A woman is wandering in an art gallery and observe
+conc2	A woman is wandering in an art gallery and observe
+conc3	Two strangers walk into the same exhibit room in a
+conc3	Two strangers wander into the same exhibit room in a
+emot1	Customer enters the front door and walks toward
+emot1	Customer enters the front door and walks toward
+emot2	A patron enters the neighborhood library
+emot2	A patron enters the neighborhood library
+emot3	A doctor and patient are in the examination 
+emot3	A doctor and patient are in the examination 
